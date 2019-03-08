@@ -80,6 +80,9 @@ type Interpreter struct {
 	// STDOUT is the writer used for PRINT and DUMP statements
 	STDOUT *bufio.Writer
 
+	// STDERR is the writer used for user facing errors during program execution
+	STDERR *bufio.Writer
+
 	// LINEEND defines any additional characters to output when printing
 	// to the output or error streams.
 	LINEEND string
@@ -110,20 +113,36 @@ type Interpreter struct {
 	fns map[string]userFunction
 }
 
-func (i *Interpreter) StdInput() *bufio.Reader {
-	return i.STDIN
+func (e *Interpreter) StdInput() *bufio.Reader {
+	if e.STDIN == nil {
+		e.STDIN = bufio.NewReader(os.Stdin)
+	}
+
+	return e.STDIN
 }
 
-func (i *Interpreter) StdOutput() *bufio.Writer {
-	return i.STDOUT
+func (e *Interpreter) StdOutput() *bufio.Writer {
+	if e.STDOUT == nil {
+		e.STDOUT = bufio.NewWriter(os.Stdout)
+	}
+
+	return e.STDOUT
 }
 
-func (i *Interpreter) Data() interface{} {
-	return i
+func (e *Interpreter) StdError() *bufio.Writer {
+	if e.STDERR == nil {
+		e.STDERR = bufio.NewWriter(os.Stderr)
+	}
+
+	return e.STDERR
 }
 
-func (i *Interpreter) LineEnding() string {
-	return i.LINEEND
+func (e *Interpreter) Data() interface{} {
+	return e
+}
+
+func (e *Interpreter) LineEnding() string {
+	return e.LINEEND
 }
 
 // New is our constructor.
@@ -258,7 +277,8 @@ func New(stream *tokenizer.Tokenizer) (*Interpreter, error) {
 			// If so that means we have duplicate line-numbers
 			//
 			if t.lines[line] != 0 {
-				fmt.Printf("WARN: Line %s is duplicated - GOTO/GOSUB behaviour is undefined\n", line)
+				err := fmt.Sprintf("WARN: Line %s is duplicated - GOTO/GOSUB behaviour is undefined", line)
+				t.StdError().WriteString(err + t.LineEnding())
 			}
 			t.lines[line] = offset
 		}
@@ -1694,22 +1714,13 @@ func (e *Interpreter) runINPUT() error {
 		return fmt.Errorf("INPUT invalid prompt-type %s", prompt.String())
 	}
 
-	inStream := e.STDIN
-	if inStream == nil {
-		inStream = bufio.NewReader(os.Stdin)
-	}
-	outStream := e.STDOUT
-	if outStream == nil {
-		outStream = bufio.NewWriter(os.Stdout)
-	}
-
-	outStream.WriteString(p)
-	outStream.Flush()
+	e.StdOutput().WriteString(p)
+	e.StdOutput().Flush()
 
 	//
 	// Read the input from the user.
 	//
-	input, _ := inStream.ReadString('\n')
+	input, _ := e.StdInput().ReadString('\n')
 
 	//
 	// Remove the newline(s).
