@@ -129,6 +129,10 @@ func (i *Interpreter) LineEnding() string {
 	return i.LINEEND
 }
 
+func (i *Interpreter) LineEnding() string {
+	return i.LINEEND
+}
+
 // New is our constructor.
 //
 // Given a lexer we store all the tokens it produced in our array, and
